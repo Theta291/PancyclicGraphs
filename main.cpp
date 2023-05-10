@@ -25,8 +25,7 @@ int main(int argc, char** argv)
     test_chords.insert(Chord(12, 14, verts));
     Hamiltonian test_graph = Hamiltonian::from_iter(verts, test_chords.begin(), test_chords.end());
 
-    for (auto it = test_graph.chords().begin(); it != test_graph.chords().end(); ++it)
-    cout << *it << endl;
+    for (Chord chord : test_graph.chords()) cout << chord << endl;
 
     int compn = 0;
     for (auto comp : test_graph.get_crossing_components())

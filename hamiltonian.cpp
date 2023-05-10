@@ -185,7 +185,7 @@ void Hamiltonian::chord_based_transform(std::function<Chord(Chord)> transform)
     // TODO: Make more efficient? Each chord is copied a lot.
     std::vector<Chord> new_chords(get_num_chords());
     int idx = 0;
-    for (auto it = chords().begin(); it != chords().end(); ++it) new_chords[idx++] = transform(*it);
+    for (Chord chord : chords()) new_chords[idx++] = transform(chord);
 
     reset_al();
     for (Chord chord : new_chords) add_chord(chord);
@@ -227,7 +227,7 @@ std::string Hamiltonian::describe(bool w_graph_num, bool w_graph_iso_num) const
     out << "Number of chords: " << get_num_chords() << std::endl;
 
     out << "Chords:" << std::endl;
-    for (auto it = chords().begin(); it != chords().end(); ++it) out << '\t' << *it << std::endl;
+    for (Chord chord : chords()) out << '\t' << chord << std::endl;
 
     if (w_graph_num)
     {
