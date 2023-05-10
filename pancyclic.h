@@ -6,6 +6,7 @@
 #include <functional>
 #include <iostream>
 #include <string>
+#include <type_traits>
 
 
 enum turning
@@ -37,6 +38,7 @@ class Chord
         // For some reason, some random piece of code needs this
         Chord();
         Chord(int start, int end, int nvert);
+        Chord(Chord const& other);
 
         void rotate(int rotation);
         void rotate();
@@ -91,9 +93,20 @@ class Span {
 
 class Hamiltonian
 {
+    using inner_AL_type = std::unordered_set<int>;
+    using outer_AL_type = std::unordered_map<int, inner_AL_type>;
+    using inner_AL_iter = decltype(std::declval<inner_AL_type>().cbegin());
+    using outer_AL_iter = decltype(std::declval<outer_AL_type>().cbegin());
+    
+
     private:
         int num_vertices;
-        std::unordered_set<Chord> chords;
+        int num_chords;
+        outer_AL_type chords_al;
+
+        void reset_al();
+        std::unordered_map<int, Hamiltonian*> get_crossing_comp_hamil_map() const;
+
     public:
         Hamiltonian();
         Hamiltonian(int nvert);
@@ -106,12 +119,40 @@ class Hamiltonian
         {
             Hamiltonian ret_graph(nvert);
             // TODO: check if chord has correct number of verts (?)
-            for (auto i = chords_begin; i != chords_end; ++i) ret_graph.chords.insert(*i);
+            for (auto i = chords_begin; i != chords_end; ++i) ret_graph.add_chord(*i);
             return ret_graph;
         }
 
         int get_num_vertices() const {return num_vertices;}
-        std::unordered_set<Chord> const& get_chords() const {return chords;}
+        int get_num_chords() const {return num_chords;}
+
+        class ChordsALIterator
+        {
+            private:
+                Chord* curr_chord;
+                outer_AL_type const* const outer;
+                std::unordered_set<int> const* inner;
+                outer_AL_iter outer_iter;
+                inner_AL_iter inner_iter;
+
+                void reset_inner();
+                void update_chord();
+                void seek_chord();
+
+            public:
+                ChordsALIterator(Hamiltonian const* hamil, bool end=false);
+                ~ChordsALIterator();
+                Chord operator*();
+                Chord* operator->();
+                ChordsALIterator& operator++();
+                ChordsALIterator operator++(int);
+
+                friend bool operator==(ChordsALIterator const& a, ChordsALIterator const& b);
+                friend bool operator!=(ChordsALIterator const& a, ChordsALIterator const& b);
+        };
+        ChordsALIterator get_chords_iter_start() const;
+        ChordsALIterator get_chords_iter_end() const;
+
         std::vector<Hamiltonian> get_crossing_components() const;
         std::unordered_map<Chord, Hamiltonian*> get_crossing_components_map() const;
 
@@ -123,7 +164,7 @@ class Hamiltonian
         static std::string get_graph_num_digs(int nverts, std::vector<short> graph_num);
 
         // TODO: Check chord num verts
-        void add_chord(Chord const& c) {chords.insert(c);}
+        void add_chord(Chord const& c);
 
         void chord_based_transform(std::function<Chord(Chord)> transform);
         void rotate(int rotation);

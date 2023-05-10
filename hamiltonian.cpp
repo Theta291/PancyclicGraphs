@@ -7,31 +7,37 @@
 #include <boost/pending/disjoint_sets.hpp>
 #include "pancyclic.h"
 
-Hamiltonian::Hamiltonian() : num_vertices(0) {}
+void Hamiltonian::reset_al() {
+    num_chords = 0;
+    chords_al.clear();
+    for (int vert = 0; vert < num_vertices; ++vert) chords_al[vert];
+}
 
-Hamiltonian::Hamiltonian(int nvert) : num_vertices(nvert) {}
+Hamiltonian::Hamiltonian() : num_chords(0), num_vertices(0) {}
+
+Hamiltonian::Hamiltonian(int nvert) : num_vertices(nvert) {reset_al();}
 
 
-// Unordered multiset would be more appropriate, but it would be a nightmare to implement the hash function
-std::vector<Hamiltonian> Hamiltonian::get_crossing_components() const
+std::unordered_map<int, Hamiltonian*> Hamiltonian::get_crossing_comp_hamil_map() const
 {
     // TODO: Look into this demo from boost:
     // https://www.boost.org/doc/libs/1_33_1/libs/graph/doc/incremental_components.html
 
     // It's hard to make a disjoint set of chords, so I just map the chords to indices
-    std::vector<Chord const*> chord_vec(chords.size());
+    std::vector<Chord const*> chord_vec(get_num_chords());
     std::unordered_map<Chord const*, int> chord_to_idx;
     int idx = 0;
 
-    for (auto const& chord : chords)
+    for (auto it = get_chords_iter_start(); it != get_chords_iter_end(); ++it)
     {
-        chord_to_idx[&chord] = idx;
-        chord_vec[idx++] = &chord;
+        Chord* chord = new Chord(*it);
+        chord_to_idx[chord] = idx;
+        chord_vec[idx++] = chord;
     }
 
     // For some reason, I have to do this to make the disjoint set use arrays to store ranks and parents
-    std::vector<int> rank(chords.size());
-    std::vector<int> parent(chords.size());
+    std::vector<int> rank(get_num_chords());
+    std::vector<int> parent(get_num_chords());
     boost::disjoint_sets<int*, int*> comps(&rank[0], &parent[0]);
 
     // Add all chords to disjoint sets
@@ -47,61 +53,42 @@ std::vector<Hamiltonian> Hamiltonian::get_crossing_components() const
     }
 
     // Make map of Hamiltonians
-    std::unordered_map<int, Hamiltonian> comps_map;
-    for (auto const& chord : chord_vec) comps_map[comps.find_set(chord_to_idx[chord])].chords.insert(*chord);
+    std::unordered_map<int, Hamiltonian*> comps_map;
+    for (auto const& chord : chord_vec)
+    {
+        // Would like to use custom allocator, but that's far too complicated
+        int comp = comps.find_set(chord_to_idx[chord]);
+        if (comps_map.find(comp) == comps_map.end()) comps_map[comp] = new Hamiltonian(num_vertices);
+        comps_map[comp]->add_chord(*chord);
+    }
+
+    for (auto chord : chord_vec) delete chord;
+    return comps_map;
+}
+
+// Unordered multiset would be more appropriate, but it would be a nightmare to implement the hash function
+std::vector<Hamiltonian> Hamiltonian::get_crossing_components() const
+{
+    std::unordered_map<int, Hamiltonian*> comp_to_hamil = get_crossing_comp_hamil_map();
 
     // Make and return a vector of Hamiltonians, one for each chord component
     std::vector<Hamiltonian> ret_vec;
-    for (auto& num_graph : comps_map)
+    for (auto& num_graph : comp_to_hamil)
     {
-        num_graph.second.num_vertices = num_vertices;
-        ret_vec.push_back(num_graph.second);
+        ret_vec.push_back(*(num_graph.second));
+        delete num_graph.second;
     }
     return ret_vec;
 }
 
 std::unordered_map<Chord, Hamiltonian*> Hamiltonian::get_crossing_components_map() const
 {
-    // TODO: Look into this demo from boost:
-    // https://www.boost.org/doc/libs/1_33_1/libs/graph/doc/incremental_components.html
-
-    // It's hard to make a disjoint set of chords, so I just map the chords to indices
-    std::vector<Chord const*> chord_vec(chords.size());
-    std::unordered_map<Chord const*, int> chord_to_idx;
-    int idx = 0;
-
-    for (auto const& chord : chords)
-    {
-        chord_to_idx[&chord] = idx;
-        chord_vec[idx++] = &chord;
-    }
-
-    // For some reason, I have to do this to make the disjoint set use arrays to store ranks and parents
-    std::vector<int> rank(chords.size());
-    std::vector<int> parent(chords.size());
-    boost::disjoint_sets<int*, int*> comps(&rank[0], &parent[0]);
-
-    // Add all chords to disjoint sets
-    for (auto const& chord : chord_vec) comps.make_set(chord_to_idx[chord]);
-
-    // For each pair of crossing chords, combine the sets
-    for (auto it1 = chord_vec.begin(); it1 != std::prev(chord_vec.end()); ++it1)
-    {
-        for (auto it2 = std::next(it1); it2 != chord_vec.end(); ++it2)
-        {
-            if ((*it1)->crossing(**it2)) comps.union_set(chord_to_idx[*it2], chord_to_idx[*it1]);
-        }
-    }
-
-    // Make two maps: one from component number to hamiltonian pointer to help keep track
-    // Another from chord to hamiltonian pointer
-    std::unordered_map<int, Hamiltonian*> comp_to_hamil;
+    std::unordered_map<int, Hamiltonian*> comp_to_hamil = get_crossing_comp_hamil_map();
     std::unordered_map<Chord, Hamiltonian*> chord_to_hamil;
-    for (auto const& chord : chord_vec) {
-        int comp = comps.find_set(chord_to_idx[chord]);
-        if (comp_to_hamil.find(comp) == comp_to_hamil.end()) comp_to_hamil[comp] = new Hamiltonian(num_vertices);
-        comp_to_hamil[comp]->chords.insert(*chord);
-        chord_to_hamil[*chord] = comp_to_hamil[comp];
+    for (auto& comp_hamil : comp_to_hamil)
+    {
+        for (auto it = comp_hamil.second->get_chords_iter_start(); it != comp_hamil.second->get_chords_iter_end(); ++it)
+        chord_to_hamil[*it] = comp_hamil.second;
     }
 
     return chord_to_hamil;
@@ -121,25 +108,22 @@ std::vector<short> Hamiltonian::get_graph_num() const
     // Round size up to align with short
     std::vector<short> ret(max_num_chords / num_bits + (rem ? num_bits - rem : 0));
     unsigned long int idx = 0;
-    Chord iter_chord(0, 1, num_vertices);
     for (int start = 0; start < num_vertices - 2; start++)
     {
-        iter_chord.start = start;
         // A chord starting at idx 0 cannot end at num_vertices-1, so I have to adjust
         // Hence the - (start ? 0 : 1)
         for (int end = start+2; end < num_vertices - (start ? 0 : 1); end++)
         {
-            iter_chord.end = end;
             unsigned long int div = idx / num_bits;
-            ret[div] |= chords.count(iter_chord) << (idx++ % num_bits);
+            ret[div] |= chords_al.at(start).count(end) << (idx++ % num_bits);
         }
     }
     return ret;
 }
 
-Hamiltonian::Hamiltonian(int nvert, std::vector<short> const& graph_num)
+Hamiltonian::Hamiltonian(int nvert, std::vector<short> const& graph_num) : num_chords(0), num_vertices(nvert)
 {
-    num_vertices = nvert;
+    reset_al();
     const unsigned int num_bits = 8 * sizeof(short);
     auto const max_num_chords = Chord::max_num_chords(num_vertices);
     const unsigned int rem = max_num_chords % sizeof(short);
@@ -156,7 +140,7 @@ Hamiltonian::Hamiltonian(int nvert, std::vector<short> const& graph_num)
         {
             iter_chord.end = end;
             unsigned long int div = idx / num_bits;
-            if ((graph_num[div] >> (idx++ % num_bits)) & 1) chords.insert(iter_chord);
+            if ((graph_num[div] >> (idx++ % num_bits)) & 1) add_chord(iter_chord);
         }
     }
 }
@@ -201,17 +185,13 @@ std::string Hamiltonian::get_graph_num_digs(int nverts, std::vector<short> graph
 
 void Hamiltonian::chord_based_transform(std::function<Chord(Chord)> transform) 
 {
-    // TODO: Make more efficient? Each chord is copied four times.
-    std::unordered_set<Chord> new_set;
-    for (auto& chord : chords)
-    {
-        // First and second copy
-        Chord new_chord = transform(chord);
-        // Third copy
-        new_set.insert(new_chord);
-    }
-    // Fourth copy
-    chords = new_set;
+    // TODO: Make more efficient? Each chord is copied a lot.
+    std::vector<Chord> new_chords(get_num_chords());
+    int idx = 0;
+    for (auto it = get_chords_iter_start(); it != get_chords_iter_end(); ++it) new_chords[idx++] = transform(*it);
+
+    reset_al();
+    for (Chord chord : new_chords) add_chord(chord);
 }
 
 void Hamiltonian::rotate(int rotation)
@@ -247,10 +227,10 @@ std::string Hamiltonian::describe(bool w_graph_num, bool w_graph_iso_num) const
 {
     std::stringstream out;
     out << "Number of vertices: " << num_vertices << std::endl;
-    out << "Number of chords: " << chords.size() << std::endl;
+    out << "Number of chords: " << get_num_chords() << std::endl;
 
     out << "Chords:" << std::endl;
-    for (auto& chord : chords) out << '\t' << chord << std::endl;
+    for (auto it = get_chords_iter_start(); it != get_chords_iter_end(); ++it) out << '\t' << *it << std::endl;
 
     if (w_graph_num)
     {
@@ -265,3 +245,81 @@ std::string Hamiltonian::describe(bool w_graph_num, bool w_graph_iso_num) const
 
     return out.str();
 }
+
+void Hamiltonian::add_chord(Chord const& chord)
+{
+    num_chords++;
+    chords_al[chord.start].insert(chord.end);
+}
+
+
+void Hamiltonian::ChordsALIterator::reset_inner()
+{
+    if (outer_iter != outer->cend())
+    {
+        inner = &(outer_iter->second);
+        inner_iter = inner->cbegin();
+    }
+    else
+    {
+        inner = nullptr;
+        inner_iter = inner_AL_iter();
+    }
+}
+
+void Hamiltonian::ChordsALIterator::update_chord()
+{
+    if (outer_iter == outer->cend()) return;
+    curr_chord->start = outer_iter->first;
+    curr_chord->end = *inner_iter;
+}
+
+Hamiltonian::ChordsALIterator::ChordsALIterator(Hamiltonian const* hamil, bool end) : outer(&(hamil->chords_al))
+{
+    curr_chord = new Chord;
+    curr_chord->num_vertices = hamil->num_vertices;
+    
+    outer_iter = end ? outer->cend() : outer->cbegin();
+    inner_iter = inner_AL_iter();
+    seek_chord();
+}
+
+Hamiltonian::ChordsALIterator Hamiltonian::get_chords_iter_start() const {return ChordsALIterator(this);}
+Hamiltonian::ChordsALIterator Hamiltonian::get_chords_iter_end() const {return ChordsALIterator(this, true);}
+
+
+Hamiltonian::ChordsALIterator::~ChordsALIterator() {delete curr_chord;}
+
+Chord Hamiltonian::ChordsALIterator::operator*() {return *curr_chord;}
+Chord* Hamiltonian::ChordsALIterator::operator->() {return curr_chord;}
+
+void Hamiltonian::ChordsALIterator::seek_chord()
+{
+    if (inner_iter == inner->cend() || inner_iter == inner_AL_iter()) {
+        while (outer_iter != outer->cend() && (inner_iter == inner->cend() || inner_iter == inner_AL_iter()))
+        {
+            ++outer_iter;
+            reset_inner();
+        }
+    }
+    update_chord();
+}
+
+Hamiltonian::ChordsALIterator& Hamiltonian::ChordsALIterator::operator++()
+{
+    ++inner_iter;
+    seek_chord();
+    return *this;
+}
+
+Hamiltonian::ChordsALIterator Hamiltonian::ChordsALIterator::operator++(int)
+{
+    ChordsALIterator tmp = *this;
+    ++(*this);
+    return tmp;
+}
+
+bool operator==(Hamiltonian::ChordsALIterator const& a, Hamiltonian::ChordsALIterator const& b)
+{return a.outer_iter == b.outer_iter && a.inner_iter == b.inner_iter;}
+
+bool operator!=(Hamiltonian::ChordsALIterator const& a, Hamiltonian::ChordsALIterator const& b) {return !(a==b);}
