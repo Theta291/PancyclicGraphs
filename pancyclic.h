@@ -126,32 +126,42 @@ class Hamiltonian
         int get_num_vertices() const {return num_vertices;}
         int get_num_chords() const {return num_chords;}
 
-        class ChordsALIterator
+        struct ChordsRange
         {
             private:
-                Chord* curr_chord;
-                outer_AL_type const* const outer;
-                std::unordered_set<int> const* inner;
-                outer_AL_iter outer_iter;
-                inner_AL_iter inner_iter;
-
-                void reset_inner();
-                void update_chord();
-                void seek_chord();
-
+                Hamiltonian const* const hamil;
             public:
-                ChordsALIterator(Hamiltonian const* hamil, bool end=false);
-                ~ChordsALIterator();
-                Chord operator*();
-                Chord* operator->();
-                ChordsALIterator& operator++();
-                ChordsALIterator operator++(int);
+                ChordsRange(Hamiltonian const* theHamil) : hamil(theHamil) {};
 
-                friend bool operator==(ChordsALIterator const& a, ChordsALIterator const& b);
-                friend bool operator!=(ChordsALIterator const& a, ChordsALIterator const& b);
+                class ChordsALIterator
+                {
+                    private:
+                        Chord* curr_chord;
+                        outer_AL_type const* const outer;
+                        std::unordered_set<int> const* inner;
+                        outer_AL_iter outer_iter;
+                        inner_AL_iter inner_iter;
+
+                        void reset_inner();
+                        void update_chord();
+                        void seek_chord();
+
+                    public:
+                        ChordsALIterator(Hamiltonian const* hamil, bool end=false);
+                        ~ChordsALIterator();
+                        Chord operator*();
+                        Chord* operator->();
+                        ChordsALIterator& operator++();
+                        ChordsALIterator operator++(int);
+
+                        friend bool operator==(ChordsALIterator const& a, ChordsALIterator const& b);
+                        friend bool operator!=(ChordsALIterator const& a, ChordsALIterator const& b) {return !(a==b);};
+                };
+
+                ChordsALIterator begin() const;
+                ChordsALIterator end() const;
         };
-        ChordsALIterator get_chords_iter_start() const;
-        ChordsALIterator get_chords_iter_end() const;
+        ChordsRange chords() const;
 
         std::vector<Hamiltonian> get_crossing_components() const;
         std::unordered_map<Chord, Hamiltonian*> get_crossing_components_map() const;

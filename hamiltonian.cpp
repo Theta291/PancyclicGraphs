@@ -24,13 +24,12 @@ std::unordered_map<int, Hamiltonian*> Hamiltonian::get_crossing_comp_hamil_map()
     // https://www.boost.org/doc/libs/1_33_1/libs/graph/doc/incremental_components.html
 
     // It's hard to make a disjoint set of chords, so I just map the chords to indices
-    std::vector<Chord const*> chord_vec(get_num_chords());
-    std::unordered_map<Chord const*, int> chord_to_idx;
+    std::vector<Chord> chord_vec(get_num_chords());
+    std::unordered_map<Chord, int> chord_to_idx;
     int idx = 0;
 
-    for (auto it = get_chords_iter_start(); it != get_chords_iter_end(); ++it)
+    for (Chord chord : chords())
     {
-        Chord* chord = new Chord(*it);
         chord_to_idx[chord] = idx;
         chord_vec[idx++] = chord;
     }
@@ -48,7 +47,7 @@ std::unordered_map<int, Hamiltonian*> Hamiltonian::get_crossing_comp_hamil_map()
     {
         for (auto it2 = std::next(it1); it2 != chord_vec.end(); ++it2)
         {
-            if ((*it1)->crossing(**it2)) comps.union_set(chord_to_idx[*it2], chord_to_idx[*it1]);
+            if (it1->crossing(*it2)) comps.union_set(chord_to_idx[*it2], chord_to_idx[*it1]);
         }
     }
 
@@ -59,10 +58,9 @@ std::unordered_map<int, Hamiltonian*> Hamiltonian::get_crossing_comp_hamil_map()
         // Would like to use custom allocator, but that's far too complicated
         int comp = comps.find_set(chord_to_idx[chord]);
         if (comps_map.find(comp) == comps_map.end()) comps_map[comp] = new Hamiltonian(num_vertices);
-        comps_map[comp]->add_chord(*chord);
+        comps_map[comp]->add_chord(chord);
     }
 
-    for (auto chord : chord_vec) delete chord;
     return comps_map;
 }
 
@@ -87,8 +85,7 @@ std::unordered_map<Chord, Hamiltonian*> Hamiltonian::get_crossing_components_map
     std::unordered_map<Chord, Hamiltonian*> chord_to_hamil;
     for (auto& comp_hamil : comp_to_hamil)
     {
-        for (auto it = comp_hamil.second->get_chords_iter_start(); it != comp_hamil.second->get_chords_iter_end(); ++it)
-        chord_to_hamil[*it] = comp_hamil.second;
+        for (Chord chord : chords()) chord_to_hamil[chord] = comp_hamil.second;
     }
 
     return chord_to_hamil;
@@ -188,7 +185,7 @@ void Hamiltonian::chord_based_transform(std::function<Chord(Chord)> transform)
     // TODO: Make more efficient? Each chord is copied a lot.
     std::vector<Chord> new_chords(get_num_chords());
     int idx = 0;
-    for (auto it = get_chords_iter_start(); it != get_chords_iter_end(); ++it) new_chords[idx++] = transform(*it);
+    for (auto it = chords().begin(); it != chords().end(); ++it) new_chords[idx++] = transform(*it);
 
     reset_al();
     for (Chord chord : new_chords) add_chord(chord);
@@ -230,7 +227,7 @@ std::string Hamiltonian::describe(bool w_graph_num, bool w_graph_iso_num) const
     out << "Number of chords: " << get_num_chords() << std::endl;
 
     out << "Chords:" << std::endl;
-    for (auto it = get_chords_iter_start(); it != get_chords_iter_end(); ++it) out << '\t' << *it << std::endl;
+    for (auto it = chords().begin(); it != chords().end(); ++it) out << '\t' << *it << std::endl;
 
     if (w_graph_num)
     {
@@ -253,7 +250,12 @@ void Hamiltonian::add_chord(Chord const& chord)
 }
 
 
-void Hamiltonian::ChordsALIterator::reset_inner()
+Hamiltonian::ChordsRange Hamiltonian::chords() const
+{
+    return ChordsRange(this);
+}
+
+void Hamiltonian::ChordsRange::ChordsALIterator::reset_inner()
 {
     if (outer_iter != outer->cend())
     {
@@ -267,14 +269,14 @@ void Hamiltonian::ChordsALIterator::reset_inner()
     }
 }
 
-void Hamiltonian::ChordsALIterator::update_chord()
+void Hamiltonian::ChordsRange::ChordsALIterator::update_chord()
 {
     if (outer_iter == outer->cend()) return;
     curr_chord->start = outer_iter->first;
     curr_chord->end = *inner_iter;
 }
 
-Hamiltonian::ChordsALIterator::ChordsALIterator(Hamiltonian const* hamil, bool end) : outer(&(hamil->chords_al))
+Hamiltonian::ChordsRange::ChordsALIterator::ChordsALIterator(Hamiltonian const* hamil, bool end) : outer(&(hamil->chords_al))
 {
     curr_chord = new Chord;
     curr_chord->num_vertices = hamil->num_vertices;
@@ -284,16 +286,16 @@ Hamiltonian::ChordsALIterator::ChordsALIterator(Hamiltonian const* hamil, bool e
     seek_chord();
 }
 
-Hamiltonian::ChordsALIterator Hamiltonian::get_chords_iter_start() const {return ChordsALIterator(this);}
-Hamiltonian::ChordsALIterator Hamiltonian::get_chords_iter_end() const {return ChordsALIterator(this, true);}
+Hamiltonian::ChordsRange::ChordsALIterator Hamiltonian::ChordsRange::begin() const {return ChordsALIterator(hamil);}
+Hamiltonian::ChordsRange::ChordsALIterator Hamiltonian::ChordsRange::end() const {return ChordsALIterator(hamil, true);}
 
 
-Hamiltonian::ChordsALIterator::~ChordsALIterator() {delete curr_chord;}
+Hamiltonian::ChordsRange::ChordsALIterator::~ChordsALIterator() {delete curr_chord;}
 
-Chord Hamiltonian::ChordsALIterator::operator*() {return *curr_chord;}
-Chord* Hamiltonian::ChordsALIterator::operator->() {return curr_chord;}
+Chord Hamiltonian::ChordsRange::ChordsALIterator::operator*() {return *curr_chord;}
+Chord* Hamiltonian::ChordsRange::ChordsALIterator::operator->() {return curr_chord;}
 
-void Hamiltonian::ChordsALIterator::seek_chord()
+void Hamiltonian::ChordsRange::ChordsALIterator::seek_chord()
 {
     if (inner_iter == inner->cend() || inner_iter == inner_AL_iter()) {
         while (outer_iter != outer->cend() && (inner_iter == inner->cend() || inner_iter == inner_AL_iter()))
@@ -305,21 +307,19 @@ void Hamiltonian::ChordsALIterator::seek_chord()
     update_chord();
 }
 
-Hamiltonian::ChordsALIterator& Hamiltonian::ChordsALIterator::operator++()
+Hamiltonian::ChordsRange::ChordsALIterator& Hamiltonian::ChordsRange::ChordsALIterator::operator++()
 {
     ++inner_iter;
     seek_chord();
     return *this;
 }
 
-Hamiltonian::ChordsALIterator Hamiltonian::ChordsALIterator::operator++(int)
+Hamiltonian::ChordsRange::ChordsALIterator Hamiltonian::ChordsRange::ChordsALIterator::operator++(int)
 {
     ChordsALIterator tmp = *this;
     ++(*this);
     return tmp;
 }
 
-bool operator==(Hamiltonian::ChordsALIterator const& a, Hamiltonian::ChordsALIterator const& b)
+bool operator==(Hamiltonian::ChordsRange::ChordsALIterator const& a, Hamiltonian::ChordsRange::ChordsALIterator const& b)
 {return a.outer_iter == b.outer_iter && a.inner_iter == b.inner_iter;}
-
-bool operator!=(Hamiltonian::ChordsALIterator const& a, Hamiltonian::ChordsALIterator const& b) {return !(a==b);}
