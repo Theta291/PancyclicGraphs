@@ -5,6 +5,8 @@
 #include <unordered_set>
 #include <functional>
 #include <iostream>
+#include <iterator>
+#include <cstddef>
 #include <string>
 #include <type_traits>
 
@@ -135,8 +137,14 @@ class Hamiltonian
 
                 class ChordsALIterator
                 {
+                    using iterator_category = std::input_iterator_tag;
+                    using difference_type = std::ptrdiff_t;
+                    using value_type = Chord;
+                    using pointer = Chord*;
+                    using referece = Chord&;
+
                     private:
-                        Chord* curr_chord;
+                        pointer curr_chord;
                         outer_AL_type const* const outer;
                         std::unordered_set<int> const* inner;
                         outer_AL_iter outer_iter;
@@ -149,8 +157,8 @@ class Hamiltonian
                     public:
                         ChordsALIterator(Hamiltonian const* hamil, bool end=false);
                         ~ChordsALIterator();
-                        Chord operator*();
-                        Chord* operator->();
+                        value_type operator*();
+                        pointer operator->();
                         ChordsALIterator& operator++();
                         ChordsALIterator operator++(int);
 

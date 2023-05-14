@@ -278,7 +278,7 @@ void Hamiltonian::ChordsRange::ChordsALIterator::update_chord()
 
 Hamiltonian::ChordsRange::ChordsALIterator::ChordsALIterator(Hamiltonian const* hamil, bool end) : outer(&(hamil->chords_al))
 {
-    curr_chord = new Chord;
+    curr_chord = new value_type;
     curr_chord->num_vertices = hamil->num_vertices;
     
     outer_iter = end ? outer->cend() : outer->cbegin();
@@ -292,8 +292,8 @@ Hamiltonian::ChordsRange::ChordsALIterator Hamiltonian::ChordsRange::end() const
 
 Hamiltonian::ChordsRange::ChordsALIterator::~ChordsALIterator() {delete curr_chord;}
 
-Chord Hamiltonian::ChordsRange::ChordsALIterator::operator*() {return *curr_chord;}
-Chord* Hamiltonian::ChordsRange::ChordsALIterator::operator->() {return curr_chord;}
+Hamiltonian::ChordsRange::ChordsALIterator::value_type Hamiltonian::ChordsRange::ChordsALIterator::operator*() {return *curr_chord;}
+Hamiltonian::ChordsRange::ChordsALIterator::pointer Hamiltonian::ChordsRange::ChordsALIterator::operator->() {return curr_chord;}
 
 void Hamiltonian::ChordsRange::ChordsALIterator::seek_chord()
 {
