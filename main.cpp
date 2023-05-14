@@ -11,7 +11,6 @@ using namespace std;
 
 int main(int argc, char** argv)
 {
-    /*
     int verts = 18;
 
     unordered_set<Chord> test_chords;
@@ -26,13 +25,13 @@ int main(int argc, char** argv)
     test_chords.insert(Chord(12, 14, verts));
     Hamiltonian test_graph = Hamiltonian::from_iter(verts, test_chords.begin(), test_chords.end());
 
-    for (auto chord : test_graph.get_chords()) cout << chord << endl;
+    for (Chord chord : test_graph.chords()) cout << chord << endl;
 
     int compn = 0;
     for (auto comp : test_graph.get_crossing_components())
     {
         cout << "Comp num: " << ++compn << endl;
-        for (auto chord : comp.get_chords()) cout << '\t' << chord << endl;
+        for (Chord chord : comp.chords()) cout << '\t' << chord << endl;
     }
 
     cout << endl << "Test graph: " << endl;
@@ -43,8 +42,8 @@ int main(int argc, char** argv)
 
     cout << endl << "Iso graph:" << endl;
     cout << iso_graph.describe() << endl;
-    */
 
+    /*
     Span s1(0, 9, 18);
     Span s2(4, 1, 18);
     Span s3(13, 10, 18);
@@ -55,5 +54,6 @@ int main(int argc, char** argv)
     cout << s3.coincident(s1) << endl;
     cout << s2.coincident(s3) << endl;
     cout << s3.coincident(s2) << endl;
+    */
     return 0;
 }

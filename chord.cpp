@@ -19,6 +19,8 @@ Chord::Chord() : num_vertices(0), start(0), end(0) {}
 
 Chord::Chord(int start, int end, int nvert) : start(start), end(end), num_vertices(nvert) {reorder();}
 
+Chord::Chord(Chord const& other) : start(other.start), end(other.end), num_vertices(other.num_vertices) {}
+
 void Chord::rotate(int rotate)
 {
     start += rotate;
